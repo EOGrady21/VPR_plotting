@@ -1,0 +1,58 @@
+Data Summary Report 
+Report processed: 2019-08-08 15:52:27 
+Cast:  0    Day:  d286    Hour:  h22 h23 
+Station:  Station Example 
+Event:  001 
+
+
+ >>>>  Time 
+Data points:  20543 
+Range:  5295374  -  10134885  (ms) 
+Range:  1.470937  -  2.815246  (hr) 
+
+
+ >>>>  Conductivity 
+Data points:  20543 
+Range:  2.71783  -  3.17975   
+
+
+ >>>>  Temperature 
+Data points:  20543 
+Range:  0.6837  -  7.5718  (c) 
+QC:  0 points below  0 deg c 
+QC:  0 points above  15 deg c 
+
+
+ >>>>  Pressure 
+Data points:  20543 
+Range:  0.284  -  150.718  (db) 
+QC:  0 below zero db 
+
+
+ >>>>  Salinity 
+Data points:  20543 
+Range:  29.3391  -  33.3253  (PSU) 
+QC:  0 points below  28 PSU 
+QC:  0 points above  35 PSU 
+
+
+ >>>>  Fluorescence 
+Data points:  20543 
+Range:  -8  -  160  (mv) 
+
+
+ >>>>  Turbidity 
+Data points:  20543 
+Range:  -14  -  128  (mv) 
+
+
+ >>>>  ROI count 
+Data points:  20543 
+Range:  1  -  17  (counts) 
+
+
+ >>>>  Sigma T 
+Data points:  20543 
+Range:  22.91341  -  26.55955   
+QC:  0 points below twenty-two  
+QC:  0 points above twenty-eight  

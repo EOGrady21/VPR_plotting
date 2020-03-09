@@ -22,7 +22,7 @@
 ###STEP 1: Set Up####
 
 #load in all required packages
-#first time, packages need to be installed with install.packages("package")
+#first time, packages need to be installed with install.package("package")
 library(ggplot2)
 library(akima)
 library(interp)
@@ -32,13 +32,15 @@ library(gridExtra)
 library(metR)
 library(tidyr)
 
-library(vprr)
 
-
+#source functions
+source('EC_functions.R')
+source('get_vpr_summary_functions.R')
+source('imageExplore.R')
 
 ####USER INPUT REQUIRED#####
 #Choose directory (where plots will be saved - ensure it ends with "/")
-plotdir <- "E:/VPR_plotting/figures/"
+plotdir <- "R:/Shared/ChisholmE/VPR_plotting/figures/"
 
 #set defaults
 #SHOULD BE UPDATED BY USER FOR SPECIFIC CRUISE OR DESIRED DATA SELECTION
@@ -49,7 +51,7 @@ station <- 'Station Example' #set station metadata
 event <- '001' #set event metadata
 
 #location of data directory
-basepath <- "E:/VP_data"
+basepath <- "E:/data"
 
 ##OPTIONAL QC PARAMETERS##
 #min and max values of each parameter
@@ -88,9 +90,10 @@ cat(paste(">>>>> Now processing VPR", tow, day, hour, '\n'))
 
 cat(paste(">>>>> Now reading CTD files", ctd_files, '\n'))
   #read CTD dat for multiple hours/ files
-
-ctd_dat <- vpr_ctd_read(ctd_files, station_of_interest = station)
-
+  ctd_dat <- list()
+  for (i in 1:length(ctd_files)){
+    ctd_dat[[i]] <- read.ctdvpr.data(ctd_files[i])
+  }
 
 
 #get ROI data
@@ -103,8 +106,21 @@ roi_num <- substr(roi_files, 5, nchar(roi_files) - 4)
 
 #make oce ctd object
 #easier for plotting
-ctd <- vpr_oce_create(ctd_dat)
+ctd <- format_oce(ctd_dat)
 
+#combine ctd data over hours into single data frame
+
+#set loop variable for reference
+if(length(names(ctd_dat)) > 1){loop = FALSE}else{loop = TRUE}
+
+if(loop == TRUE){
+  #for multiple hours of data
+ctd_dat_all <- do.call(rbind, ctd_dat)
+cat(length(ctd_dat), ' hours of CTD data combined!')
+}else{
+  #for single hour of data
+  ctd_dat_all <- ctd_dat
+}
 
 #get roi number that will match ctd time_ms
 rois <- as.numeric(substr(roi_num, 1, 8))
@@ -113,10 +129,10 @@ roi_table <- as.data.frame(table(rois))
 
 
 #subset ctd and roi data where time/roi identifier match
-ctd_sub <- which(ctd_dat$time_ms %in% rois)
-roi_sub <- which(rois %in% ctd_dat$time_ms)
+ctd_sub <- which(ctd_dat_all$time_ms %in% rois)
+roi_sub <- which(rois %in% ctd_dat_all$time_ms)
 #subset data individually
-ctd_dat_sub <- ctd_dat[ctd_sub,]
+ctd_dat_sub <- ctd_dat_all[ctd_sub,]
 
 #EC & KS fix 2019/08/08 due to error producing NA roi numbers
 roi_dat_sub <- rois[!duplicated(rois)]
@@ -133,9 +149,13 @@ all_dat <- ctd_dat_sub %>%
   dplyr::mutate(., roi = roi_dat_sub) %>%
   dplyr::mutate(., n_roi = roi_table$Freq) #add n_roi (count of rois per second)
 
+#calculated variables
 
-#add  time(hr) to combined data frame
+sigmaT <- swSigmaT(salinity = all_dat$salinity, temperature = all_dat$temperature, pressure = all_dat$pressure)
+
+#add sigma t and time(hr) to combined data frame
 all_dat <- all_dat %>%
+  dplyr::mutate(., sigmaT = sigmaT) %>%
   dplyr::mutate(., avg_hr = time_ms/3.6e+06)
 
 
@@ -166,10 +186,11 @@ if (qc_ans == 'y'){
 }
 #processing for plotting format
 #create oce objects with all variables
-
-ctd_roi_oce <- vpr_oce_create(all_dat)
-
-# TODO: estimate imageVolume in order to properly calculate concentrations??
+ctd_roi_oce <- as.ctd(all_dat)
+otherVars<-  c('time_ms', 'fluorescence_mv', 'turbidity_mv', 'n_roi', 'sigmaT')
+for ( o in otherVars){
+  eval(parse(text = paste0("ctd_roi_oce <- oceSetData(ctd_roi_oce, name = '",o,"', value = all_dat$",o,")")))
+}
 
 #seperate into up and down casts before binning data
 #find upcasts
