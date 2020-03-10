@@ -1,0 +1,52 @@
+---
+title: "Untitled"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(vprr)
+
+```
+
+Sidebar
+-------------------
+```{r}
+
+station <- 'Example'
+#textInput('station', label = 'Station ID', placeholder = 'eg. CAP1-2')
+
+fileInput('ctd_files', label = 'CTD Files', multiple = TRUE, accept = '.dat')
+
+#ctd_fns <- 'E:/VP_data/IML2018051/rois/vpr0/d286/h22ctd.dat'
+
+```
+
+
+
+```{r}
+
+#ctd_dat <- reactive(vpr_ctd_read(ctd_files = input$ctd_files, station_of_interest = station))
+
+fns <- isolate({ input$ctd_files })
+
+print(fns)
+#ctd_dat <- vpr_ctd_read(ctd_files = fns, station_of_interest = station)
+
+#ctd_dat <- vpr_ctd_read(ctd_fns, station_of_interest = station)
+  
+  
+#renderTable({
+ # head(ctd_dat())
+#})
+
+
+```
+
+
+

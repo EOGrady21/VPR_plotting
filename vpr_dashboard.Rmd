@@ -1,0 +1,125 @@
+---
+title: "Video Plankton Recorder"
+output: 
+  flexdashboard::flex_dashboard
+runtime: shiny
+---
+
+```{r}
+
+#load in all required packages
+#first time, packages need to be installed with install.packages("package")
+library(ggplot2)
+library(akima)
+library(interp)
+library(dplyr)
+library(oce)
+library(gridExtra)
+library(metR)
+library(tidyr)
+library(cmocean)
+
+library(shiny)
+library(flexdashboard)
+library(DT)
+
+library(vprr)
+
+
+```
+
+
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+
+
+
+####USER INPUT REQUIRED#####
+#Choose directory (where plots will be saved - ensure it ends with "/")
+textInput('plotdir', label = 'Plotting Directory: ', placeholder = "E:/VPR_plotting/figures")
+#plotdir <- "E:/VPR_plotting/figures/"
+
+#set defaults
+#SHOULD BE UPDATED BY USER FOR SPECIFIC CRUISE OR DESIRED DATA SELECTION
+
+textInput('cruise', 'Cruise ID', placeholder = 'eg. IML2018051')
+#cruise <- 'IML2018051'
+
+textInput('tow', label = 'VPR Tow ID', placeholder = 'eg. 1')
+#tow <- '0' #VPR tow of interest
+
+textInput('station', label = 'Station ID', placeholder = 'eg. CAP1-2')
+#station <- 'Station Example' #set station metadata
+
+textInput('event', label = 'Event ID', placeholder = 'eg. 001')
+event <- '001' #set event metadata
+
+numericInput('imageVolume', label = 'Image Volume ', value = 123456 )
+#imageVolume <- 12345
+
+numericInput('binSize', label = 'Bin Size', value = 5)
+#binSize <- 5
+#location of data directory
+textInput('basepath', label = 'Base Path', placeholder = 'E:/VPR_data')
+#basepath <- "E:/VP_data"
+
+##OPTIONAL QC PARAMETERS##
+#min and max values of each parameter
+
+ sliderInput("sal_range", label = h3("Salinity Range"), min = 0, 
+        max = 50, value = c(28, 35))
+    
+  sliderInput("temp_range", label = h3("Temperature Range"), min = 0, 
+        max = 50, value = c(0, 15))
+  
+   sliderInput("pres_range", label = h3("Pressure Range"), min = 0, 
+        max = 500, value = c(0, 500))
+   
+   
+#sal_range <- c(28, 35) #salinity range (PSU)
+#temp_range <- c(0, 15) #temperature range (deg C)
+#pres_range <- c(0, 500) #pressure range (db)
+
+```
+
+
+Column {.tabset}
+------------------------------------
+
+### Data table
+```{r}
+
+#reactive({
+####STEP 2: Load data####
+
+#gets day and hour in cast
+day <- reactive(list.files(file.path(input$basepath, input$cruise, 'rois', paste0('vpr', input$tow))))
+hour <- reactive(list.files(file.path(input$basepath, input$cruise, 'rois', paste0('vpr', input$tow), day())))
+houro <- reactive(unique(substr(hour(), 1,3)))
+
+#LOAD CTD
+ctd_path <- reactive(unique(file.path(input$basepath, input$cruise, 'rois', paste0('vpr', input$tow), day)))
+ctd_files <- reactive(list.files(ctd_path(), pattern = '.dat', full.names = TRUE ))
+
+
+
+ctd_dat <- reactive(vprr::vpr_ctd_read(ctd_files(), station_of_interest = input$station))
+
+
+
+#renderValueBox(day())
+#renderValueBox(houro())
+
+
+```
+
+Row 
+----------------------
+
+```{r}
+
+  
+```

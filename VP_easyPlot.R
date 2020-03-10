@@ -31,6 +31,7 @@ library(oce)
 library(gridExtra)
 library(metR)
 library(tidyr)
+library(cmocean)
 
 library(vprr)
 
@@ -48,6 +49,9 @@ tow <- '0' #VPR tow of interest
 station <- 'Station Example' #set station metadata
 event <- '001' #set event metadata
 
+
+imageVolume <- 12345
+binSize <- 5
 #location of data directory
 basepath <- "E:/VP_data"
 
@@ -169,33 +173,15 @@ if (qc_ans == 'y'){
 
 ctd_roi_oce <- vpr_oce_create(all_dat)
 
-# TODO: estimate imageVolume in order to properly calculate concentrations??
 
-#seperate into up and down casts before binning data
-#find upcasts
-upcast <- getCast_EC(data = ctd_roi_oce, cast_direction = 'ascending', data_type = 'df')
-upcast2 <- lapply(upcast, bin_average_vpr_EC)
-upcast_df <- do.call(rbind, upcast2)
-#find downcasts
-downcast <- getCast_EC(ctd_roi_oce, "descending", "df")
-downcast2 <- lapply(downcast, bin_average_vpr_EC)
-downcast_df <- do.call(rbind, downcast2)
-#combine_data into bins
-vpr_depth_bin <- rbind(upcast_df, downcast_df)
-vpr_depth_bin <- data.frame(vpr_depth_bin)
+vpr_depth_bin <- bin_cast(ctd_roi_oce = ctd_roi_oce , imageVolume = imageVolume, binSize = binSize, rev = TRUE)
 
-#remove outliers from concentration 
-#(spikes when short time is spent in one depth bin)
-#zero time values for neat plot axes 
-vpr_depth_bin <- vpr_depth_bin %>%
-  dplyr::mutate(., avg_time_h = avg_time_h - min(avg_time_h)) %>%
-  dplyr::filter(., time_diff_s >= 0.8)
 
 ##data report
 fn = paste0(plotdir,'vpr', tow, 'dataSummary.txt')
 #data summary for original (pre QC) data, 
 #to get stats on points removed outside of bounds
-dataSummary(all_dat_o, fn = fn, station, event, sal_range, temp_range, pres_range)
+vpr_summary(all_dat_o, fn = fn, tow = tow, day = day, hour = hour)
 
 cat(paste("Formatting complete! \n"))
 
@@ -203,69 +189,15 @@ cat(paste("Formatting complete! \n"))
 
 ####CTD PROFILE PLOTS###
 
-#set consistent pressure axis between plots
-y_limits_p <- c(max(all_dat$pressure), min(all_dat$pressure))
-#plot temp
-p <- ggplot(all_dat) +
-  geom_point(aes(x = temperature, y = pressure), col = 'red') + #adds pts
-  scale_y_reverse(name = 'Pressure (db)', limits = y_limits_p) #flips y axis
-#plot salinity
-p_TS <- p + geom_point(aes(x = (salinity -25), y = pressure), col = 'blue') + 
-  #create secondary axis with appropriate scaling to show two variables on plot
-  scale_x_continuous(name = 'Temperature (c)',sec.axis = sec_axis(~ . +25, name = 'Salinity (PSU)')) +
-  #change colours of axes to match data pts for clarity
-  theme(axis.line.x.bottom = element_line(colour = 'red'), 
-        axis.ticks.x.bottom = element_line(colour = 'red'), 
-        panel.background = element_blank(),
-        panel.grid = element_blank(), 
-        axis.line.y = element_line(linetype = 'solid'),
-        axis.line.x.top = element_line(colour = 'blue'),
-        axis.ticks.x.top = element_line(colour = 'blue')
-  )
-
-
-#plot fluorescence
-p <- ggplot(all_dat) +
-  geom_point(aes(x = fluorescence_mv, y = pressure), col = 'green') + #add pts
-  scale_y_reverse(name = 'Pressure (db)', limits = y_limits_p) #flip y axis
-
-#plot density
-p_FD <- p + geom_point(aes(x = (sigmaT  -20) *20, y = pressure)) + #add pts
-  #set up bopth axes with relative scales
-  scale_x_continuous(name = 'Fluorescence (mv)',sec.axis = sec_axis(~. /20  +20, name = 'Density')) +
-  #change colour of axes to match data pts
-  theme(axis.line.x.bottom = element_line(colour = 'green'), 
-        axis.ticks.x.bottom = element_line(colour = 'green'),
-        panel.background = element_blank(),
-        panel.grid = element_blank(), 
-        axis.line.y = element_line(linetype = 'solid'),
-        axis.line.x.top = element_line(colour = 'black')
-        )
-
-
-#plot concentration profile
-pp <- ggplot(vpr_depth_bin) +
-  geom_point(aes(x = pressure, y = conc_m3/1024)) + #conversion of m3 to L using default density
-  #create average line (can only be calculated along y so requires flipping plot after calculation)
-  stat_summary_bin(aes(x = pressure, y = conc_m3/1024), fun.y = 'mean', col = 'red', geom = 'line', size = 3, alpha = 0.5)  +
-  #reverse what will become y axis
-  scale_x_reverse(name = 'Pressure (db)', limits = y_limits_p) +
-  #set what will become x axis so that dimension match other profile plots (axes on both ends)
-  scale_y_continuous(name = 'ROI L^-1', position = 'right', sec.axis = sec_axis(~. , name = 'ROI L^-1')) +
-  theme_classic() +
-  #flip x and y axes now that calculations are finished
-  coord_flip()
-
 #save three panel ctd profile plots
 png(paste0(plotdir, 'vpr', tow,'summaryCTDplots.png'))
-grid.arrange(p_TS, p_FD,pp, ncol = 3, nrow = 1)
-dev.off()
+vpr_plot_profile(taxa_conc_n = vpr_depth_bin, taxa_to_plot = NULL)
 cat(paste('>>>>>>',paste0('vpr', tow,'summaryCTDplots.png'), 'saved! \n'))
 
 
 #plot VPR path
 png(paste0(plotdir, 'vpr', tow,'vprPath.png'))
-q <- qplot(vpr_depth_bin$avg_time_h, vpr_depth_bin$pressure, geom = 'line') +
+q <- qplot(vpr_depth_bin$avg_hr, vpr_depth_bin$depth, geom = 'line') +
   scale_y_reverse('Pressure') +
   scale_x_continuous('Time') +
   theme_classic()+
@@ -280,10 +212,13 @@ cat(paste('>>>>>>',paste0('vpr', tow,'vprPath.png'), 'saved! \n'))
 #plot concentration contours
 png(paste0(plotdir, 'vpr', tow,'conPlots_conc.png'), width = 1500, height = 500)
 
-p <- conPlot_conc(na.omit(vpr_depth_bin), dup = 'strip') #plot contours
+cmpalf <- cmocean::cmocean('matter')
+cmpal <- cmpalf(n = 100)
+p <- vpr_plot_contour(vpr_depth_bin, var = 'conc_m3', dup = 'strip', method = 'oce', bw = 1, labels = FALSE)+ #plot contours
+  scale_fill_gradientn(colours = cmpal)
 #add concentration bubbles and path line
-pp <- p + geom_line(data = vpr_depth_bin, aes(x = avg_time_h, y = min_pressure), col = 'snow4', inherit.aes = FALSE) +
-  geom_point(data = vpr_depth_bin, aes(x = avg_time_h, y = min_pressure, size = conc_m3), alpha = 0.1)+
+pp <- p + geom_line(data = vpr_depth_bin, aes(x = avg_hr, y = min_depth), col = 'snow4', inherit.aes = FALSE) +
+  geom_point(data = vpr_depth_bin, aes(x = avg_hr, y = min_depth, size = conc_m3), alpha = 0.1)+
   ggtitle('Concentration') +
   labs(size = "")+ #size scale null (same as contour scale units)
   scale_size_continuous(range = c(0, 10)) #enlarge bubbles
@@ -297,32 +232,33 @@ cat(paste('>>>>>>',paste0('vpr', tow,'conPlots_conc.png'), 'saved! \n'))
 ##contour plots for ctd vars
 #sigma t contours
 #interpolate data
-  vpr_int <- akima::interp(x = vpr_depth_bin$avg_time_h, y = vpr_depth_bin$pressure, z = vpr_depth_bin$density, duplicate = 'strip')
+  vpr_int <- akima::interp(x = vpr_depth_bin$avg_hr, y = vpr_depth_bin$depth, z = vpr_depth_bin$density, duplicate = 'strip')
     
 #plot
   #set consistent x and y limits
 y_limits <- rev(range(vpr_int$y))
 x_limits <- range(vpr_int$x)
 
-
+cmpalf <- cmocean::cmocean('dense')
 png(paste0(plotdir, 'vpr', tow, 'sigmaT_contour.png'), width = 2000, height = 500)
 #make contour plot
 filled.contour(vpr_int$x, vpr_int$y, vpr_int$z, nlevels = 50,
-               color.palette = colorRampPalette(c("blue", 'red')),
+               color.palette = cmpalf,
+               #color.palette = colorRampPalette(c("blue", 'red')),
                ylim = y_limits, xlab = "Time (h)", ylab = "Depth (m)", main = 'Concentration over Density',
                #add axes and annotations
                plot.axes = {
                  #add concentration bubbles
-                 points(vpr_depth_bin$avg_time_h, vpr_depth_bin$pressure, pch = ".")
+                 points(vpr_depth_bin$avg_hr, vpr_depth_bin$depth, pch = ".")
                  #add path line
-                 points((all_dat$avg_hr - min(all_dat$avg_hr)), all_dat$pressure, type = 'l')
+                 points((all_dat$avg_hr - min(all_dat$avg_hr)), all_dat$depth, type = 'l')
                  #add axes
                  axis(1)
                  axis(2)
                  #add contour lines
                  contour(vpr_int$x, vpr_int$y, vpr_int$z, nlevels=10, add = T)
                  #enlarge bubbles based on concentrations
-                 symbols(vpr_depth_bin$avg_time_h, vpr_depth_bin$pressure, circles = vpr_depth_bin$conc_m3, 
+                 symbols(vpr_depth_bin$avg_hr, vpr_depth_bin$depth, circles = vpr_depth_bin$conc_m3, 
                          fg = "black", bg = "grey", inches = 0.3, add = T)
                 
                  
@@ -333,31 +269,33 @@ cat(paste('>>>>>>',paste0('vpr', tow, 'sigmaT_contour.png'), 'saved! \n'))
 
 #temperature
 #interpolate data
-vpr_int <- akima::interp(x = vpr_depth_bin$avg_time_h, y = vpr_depth_bin$pressure, z = vpr_depth_bin$temperature, duplicate= 'strip')
+vpr_int <- akima::interp(x = vpr_depth_bin$avg_hr, y = vpr_depth_bin$depth, z = vpr_depth_bin$temperature, duplicate= 'strip')
 
 #plot
 #set consistent x and y limits
 y_limits <- rev(range(vpr_int$y))
 x_limits <- range(vpr_int$x)
 
+cmpalf <- cmocean::cmocean('thermal')
 png(paste0(plotdir, 'vpr', tow, 'temp_contour.png'), width = 2000, height = 500)
 #make contour plot
 filled.contour(vpr_int$x, vpr_int$y, vpr_int$z, nlevels = 50,
-               color.palette = colorRampPalette(c( "blue", 'red')),
+               color.palette = cmpalf,
+               #color.palette = colorRampPalette(c( "blue", 'red')),
                ylim = y_limits, xlab = "Time (h)", ylab = "Depth (m)", main = 'Concentration over Temperature',
                #add anotations
                plot.axes = {
                  #add bubbles
-                 points(vpr_depth_bin$avg_time_h, vpr_depth_bin$pressure, pch = ".")
+                 points(vpr_depth_bin$avg_hr, vpr_depth_bin$depth, pch = ".")
                  #add vpr path
-                 points(all_dat$avg_hr - min(all_dat$avg_hr), all_dat$pressure, type = 'l')
+                 points(all_dat$avg_hr - min(all_dat$avg_hr), all_dat$depth, type = 'l')
                  #add axes
                  axis(1)
                  axis(2)
                  #add contour lines
                  contour(vpr_int$x, vpr_int$y, vpr_int$z, nlevels=10, add = T)
                  #enlarge bubble size based on concentration
-                 symbols(vpr_depth_bin$avg_time_h, vpr_depth_bin$pressure, circles = vpr_depth_bin$conc_m3, 
+                 symbols(vpr_depth_bin$avg_hr, vpr_depth_bin$depth, circles = vpr_depth_bin$conc_m3, 
                          fg = "darkgrey", bg = "grey", inches = 0.3, add = T)
                  
                  
@@ -369,31 +307,33 @@ cat(paste('>>>>>>',paste0('vpr', tow, 'temp_contour.png'), 'saved! \n'))
 
 #salinity
 #interpolate data
-vpr_int <- akima::interp(x = vpr_depth_bin$avg_time_h, y = vpr_depth_bin$pressure, z = vpr_depth_bin$salinity, duplicate = 'strip')
+vpr_int <- akima::interp(x = vpr_depth_bin$avg_hr, y = vpr_depth_bin$depth, z = vpr_depth_bin$salinity, duplicate = 'strip')
 
 #plot
 #set consistent x and y limits
 y_limits <- rev(range(vpr_int$y))
 x_limits <- range(vpr_int$x)
 
+cmpalf <- cmocean::cmocean('haline')
 png(paste0(plotdir, 'vpr', tow, 'sal_contour.png'), width = 2000, height = 500)
 #make contour plot
 filled.contour(vpr_int$x, vpr_int$y, vpr_int$z, nlevels = 50,
-               color.palette = colorRampPalette(c( "blue", 'red')),
+               color.palette = cmpalf,
+               #color.palette = colorRampPalette(c( "blue", 'red')),
                ylim = y_limits, xlab = "Time (h)", ylab = "Depth (m)", main = 'Concentration over Salinity',
                #add annotations
                plot.axes = {
                  #add bubbles
-                 points(vpr_depth_bin$avg_time_h, vpr_depth_bin$pressure, pch = ".")
+                 points(vpr_depth_bin$avg_hr, vpr_depth_bin$depth, pch = ".")
                  #add vpr path
-                 points(all_dat$avg_hr - min(all_dat$avg_hr), all_dat$pressure, type = 'l')
+                 points(all_dat$avg_hr - min(all_dat$avg_hr), all_dat$depth, type = 'l')
                  #add axes
                  axis(1)
                  axis(2)
                  #add contour lines
                  contour(vpr_int$x, vpr_int$y, vpr_int$z, nlevels=10, add = T)
                  #enlarge bubbles based on concentration
-                 symbols(vpr_depth_bin$avg_time_h, vpr_depth_bin$pressure, circles = vpr_depth_bin$conc_m3, 
+                 symbols(vpr_depth_bin$avg_hr, vpr_depth_bin$depth, circles = vpr_depth_bin$conc_m3, 
                          fg = "darkgrey", bg = "grey", inches = 0.3, add = T)
                  
                  
