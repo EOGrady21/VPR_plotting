@@ -38,13 +38,13 @@ ui <- fluidPage(
       textInput('event', label = 'Event ID', placeholder = 'eg. 001'),
       
       
-      numericInput('imageVolume', label = 'Image Volume ', value = 123456 ),
+      numericInput('imageVolume', label = 'Image Volume ', value = 108155 ),
       
       
       numericInput('binSize', label = 'Bin Size', value = 5),
       
       
-      textInput('basepath', label = 'Base Path', placeholder = 'E:/VP_data', value = 'E:/VP_data'),
+      textInput('basepath', label = 'Base Path', placeholder = 'E:/VP_data', value = 'D:/WORK FROM HOME/vp_DATA'),
       
       
       ##OPTIONAL QC PARAMETERS##
@@ -471,7 +471,7 @@ server <- function(input, output) {
   imgs_path <- reactive({
     if (is.null(values$upload_state)) {
       
-      imgs_path <-  paste0("E:/VP_data/", input$cruise, "/rois/vpr", input$tow,"/d", input$day, "/h", input$hour, "/")
+      imgs_path <-  paste0(input$basepath, '/', input$cruise, "/rois/vpr", input$tow,"/d", input$day, "/h", input$hour, "/")
       
       
       
