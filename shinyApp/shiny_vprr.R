@@ -44,7 +44,7 @@ ui <- fluidPage(
       numericInput('binSize', label = 'Bin Size', value = 5),
       
       
-      textInput('basepath', label = 'Base Path', placeholder = 'E:/VP_data', value = 'D:/WORK FROM HOME/vp_DATA'),
+      textInput('basepath', label = 'Base Path', placeholder = 'E:/VP_data', value = 'C:/data'), # 'C:/data'
       
       
       ##OPTIONAL QC PARAMETERS##
@@ -82,7 +82,7 @@ ui <- fluidPage(
                   tabPanel("Summary", verbatimTextOutput("summary")),
                   tabPanel("Table", DT::dataTableOutput("ctdroi")),
                   tabPanel("Images",
-                           shinyDirButton("dir", "Chose ROI directory", "Upload"),
+                           shinyDirButton("dir", "Choose ROI directory", "Upload"),
                            numericInput('num', 'Number of images shown', value = 100, step = 2),
                            
                            fluidRow(
@@ -270,7 +270,7 @@ server <- function(input, output) {
       dplyr::filter(., avg_hr < max(input$hr_range)) %>%
       dplyr::filter(., avg_hr > min(input$hr_range))
     
-    vpr_plot_profile(taxa_conc_n = vpr_sel, taxa_to_plot = NULL)
+    vpr_plot_profile(taxa_conc_n = vpr_sel, taxa_to_plot = NULL, plot_conc = TRUE)
     
     
   })
