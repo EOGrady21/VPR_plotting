@@ -8,10 +8,18 @@ library(base64enc)
 library(magick)
 library(shinyFiles)
 library(bslib)
+library(thematic)
+library(shinyWidgets)
+
+thematic_shiny() #theme plots to match bs_theme() argument
+
+light <- bs_theme(bootswatch = 'zephyr')
+dark <-  bs_theme(bootswatch = 'superhero')
 
 ui <- fluidPage(
-  theme = bs_theme(bootswatch = 'zephyr'),
   
+  theme = light,
+  switchInput(inputId = "dark_mode", label = "Dark mode", value = FALSE, size = 'mini'),  
   # plot formatting (fix from https://stackoverflow.com/questions/45642283/how-to-save-png-image-of-shiny-plot-so-it-matches-the-dimensions-on-my-screen)
   
   tags$script(
@@ -103,7 +111,6 @@ Shiny.onInputChange('shiny_height',myHeight)
                                  )
                           ),
                           fluidRow(
-                            
                            column(12, plotOutput("plot")),
                            column(3, offset = 9,
                                   downloadButton('save2', label = 'Save')
@@ -146,9 +153,11 @@ Shiny.onInputChange('shiny_height',myHeight)
 )
 
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   
-  
+  observe(session$setCurrentTheme(
+    if (isTRUE(input$dark_mode)) dark else light
+  ))
     
   datasetInput <- reactive({
     
